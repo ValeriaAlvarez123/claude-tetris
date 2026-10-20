@@ -32,6 +32,25 @@
         </div>
 
         <div class="panel-section">
+          <span class="label">DESAFÍOS</span>
+          <div class="multiselect" id="challenges">
+            <button type="button" class="multiselect-toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="Desafíos">
+              <span class="multiselect-label">Ninguno</span>
+              <span class="caret">▾</span>
+            </button>
+            <div class="multiselect-menu" role="listbox" aria-multiselectable="true" hidden>
+              <button type="button" class="multiselect-option" role="option" aria-selected="false" data-value="garbage">
+                <span class="check"></span><span class="name">Basura</span><small>+2 líneas cada 20 s</small>
+              </button>
+              <button type="button" class="multiselect-option" role="option" aria-selected="false" data-value="scattered">
+                <span class="check"></span><span class="name">Escombros</span><small>bloques sueltos al iniciar</small>
+              </button>
+            </div>
+          </div>
+          <span class="challenge-info" id="challenge-info"></span>
+        </div>
+
+        <div class="panel-section">
           <span class="label">TEMA</span>
           <label class="theme-toggle">
             <input type="checkbox" id="theme-toggle" role="switch" aria-label="Modo claro" />

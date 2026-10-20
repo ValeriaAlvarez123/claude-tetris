@@ -16,6 +16,7 @@ const COLORS = [
   '#f06292', // R - pink (anillo)
   '#ffffff', // W - comodín (se dibuja con degradado arcoíris)
   '#a1887f', // C - compactadora
+  '#616161', // G - basura (desafío)
 ];
 
 const PIECES = [
@@ -44,6 +45,16 @@ const COMPACT = 10;
 const COMPACT_EVERY = 45000;
 const COMPACT_RADIUS = 2;
 
+// Desafíos: reglas opcionales y combinables que suben la dificultad.
+// `start` se ejecuta al iniciar la partida; `apply` cada `every` ms de juego.
+const GARBAGE = 11;
+const SCATTER_COUNT = 15;
+const SCATTER_ROWS = 8;
+const CHALLENGES = {
+  garbage: { every: 20000, apply: () => addGarbage(2), info: 'Basura en' },
+  scattered: { start: () => scatterGarbage(SCATTER_COUNT, SCATTER_ROWS) },
+};
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -56,12 +67,19 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const challengesEl = document.getElementById('challenges');
+const challengesToggle = challengesEl.querySelector('.multiselect-toggle');
+const challengesLabel = challengesEl.querySelector('.multiselect-label');
+const challengesMenu = challengesEl.querySelector('.multiselect-menu');
+const challengeOptions = challengesMenu.querySelectorAll('[role="option"]');
+const challengeInfo = document.getElementById('challenge-info');
 
 const THEME_KEY = 'tetris-theme';
 let gridColor, highlightColor;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let wildCharge, wildPending, compactAccum, compactPending;
+let activeChallenges = new Set(), challengeAccum;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -198,7 +216,39 @@ function applyCompact() {
   }
 }
 
+// Sube `count` filas de basura (cada una con un hueco al azar) desde abajo.
+function addGarbage(count) {
+  for (let i = 0; i < count; i++) {
+    const overflow = board.shift().some(v => v);
+    const row = new Array(COLS).fill(GARBAGE);
+    row[Math.floor(Math.random() * COLS)] = 0;
+    board.push(row);
+    if (overflow) { endGame(); return; }
+  }
+  // Empujar la pieza en juego hacia arriba si la basura la alcanzó
+  for (let i = 0; i < count && collide(current.shape, current.x, current.y); i++) current.y--;
+  if (collide(current.shape, current.x, current.y)) endGame();
+}
+
+// Reparte `count` bloques de basura sueltos en las `rows` filas de abajo,
+// sin llegar a completar ninguna fila.
+function scatterGarbage(count, rows) {
+  let placed = 0;
+  for (let tries = 0; placed < count && tries < count * 10; tries++) {
+    const r = ROWS - 1 - Math.floor(Math.random() * rows);
+    const c = Math.floor(Math.random() * COLS);
+    if (board[r][c] || board[r].filter(v => v).length >= COLS - 1) continue;
+    board[r][c] = GARBAGE;
+    placed++;
+  }
+}
+
 function lockPiece() {
+  // Bloquear con celdas por encima del tablero (empujada por la basura) = game over
+  if (current.shape.some((row, r) => current.y + r < 0 && row.some(v => v))) {
+    endGame();
+    return;
+  }
   if (current.wild) {
     applyWild();
   } else if (current.compact) {
@@ -373,9 +423,27 @@ function loop(ts) {
       lockPiece();
     }
   }
+  for (const id of activeChallenges) {
+    const rule = CHALLENGES[id];
+    if (!rule.every || gameOver) continue;
+    challengeAccum[id] += dt;
+    if (challengeAccum[id] >= rule.every) {
+      challengeAccum[id] = 0;
+      rule.apply();
+    }
+  }
+  updateChallengeInfo();
   if (gameOver) return;
   draw();
   animId = requestAnimationFrame(loop);
+}
+
+function updateChallengeInfo() {
+  const text = [...activeChallenges]
+    .filter(id => CHALLENGES[id].every)
+    .map(id => `${CHALLENGES[id].info} ${Math.ceil((CHALLENGES[id].every - challengeAccum[id]) / 1000)} s`)
+    .join('\n');
+  if (challengeInfo.textContent !== text) challengeInfo.textContent = text;
 }
 
 function setTheme(theme) {
@@ -401,6 +469,12 @@ function init() {
   wildPending = false;
   compactAccum = 0;
   compactPending = false;
+  challengeAccum = {};
+  for (const id of activeChallenges) {
+    challengeAccum[id] = 0;
+    CHALLENGES[id].start?.();
+  }
+  updateChallengeInfo();
   paused = false;
   gameOver = false;
   dropInterval = 1000;
@@ -444,6 +518,29 @@ restartBtn.addEventListener('click', init);
 themeToggle.addEventListener('change', () => {
   setTheme(themeToggle.checked ? 'light' : 'dark');
   themeToggle.blur(); // evita que Space active el switch en vez de la caída
+});
+
+function setChallengesOpen(open) {
+  challengesMenu.hidden = !open;
+  challengesToggle.setAttribute('aria-expanded', open);
+}
+
+challengesToggle.addEventListener('click', () => {
+  setChallengesOpen(challengesMenu.hidden);
+  challengesToggle.blur(); // evita que Space abra/cierre el menú en vez de la caída
+});
+
+challengeOptions.forEach(option => option.addEventListener('click', () => {
+  option.setAttribute('aria-selected', option.getAttribute('aria-selected') !== 'true');
+  option.blur();
+  const selected = [...challengeOptions].filter(o => o.getAttribute('aria-selected') === 'true');
+  activeChallenges = new Set(selected.map(o => o.dataset.value));
+  challengesLabel.textContent = selected.map(o => o.querySelector('.name').textContent).join(', ') || 'Ninguno';
+  init();
+}));
+
+document.addEventListener('click', e => {
+  if (!challengesEl.contains(e.target)) setChallengesOpen(false);
 });
 
 let savedTheme = null;
