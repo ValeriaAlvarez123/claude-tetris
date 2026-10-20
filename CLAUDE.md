@@ -32,6 +32,8 @@ All game logic lives in `game.js` (single file, no modules). Key pieces:
 - **Leveling**: level = `floor(lines / 10) + 1`; `dropInterval = max(100, 1000 - (level - 1) * 90)` ms.
 - **Ghost piece** (`ghostY`): projects the current piece straight down to its landing row and draws it at low alpha.
 
+**Temas**: los colores viven como variables CSS en `style.css` (`:root` = oscuro por defecto, `[data-theme="light"]` = claro). `setTheme()` en `game.js` aplica `data-theme`, persiste la elección en `localStorage` (`tetris-theme`), cachea `--grid` y `--block-highlight` para el canvas y redibuja. `init()` no toca el tema.
+
 Rendering is all Canvas 2D (`#board` for the main grid, `#next-canvas` for the next-piece preview) — there is no DOM-based board representation.
 
 State is a set of module-level `let` variables (`board`, `current`, `next`, `score`, `lines`, `level`, `paused`, `gameOver`, ...) reset by `init()`, which is also called by the restart button.
