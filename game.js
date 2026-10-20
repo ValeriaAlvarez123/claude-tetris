@@ -14,6 +14,7 @@ const COLORS = [
   '#90caf9', // J - pale blue
   '#ffb74d', // L - orange
   '#f06292', // R - pink (anillo)
+  '#ffffff', // W - comodín (se dibuja con degradado arcoíris)
 ];
 
 const PIECES = [
@@ -29,6 +30,12 @@ const PIECES = [
 ];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
+
+// Comodín: bloque 1×1 que aparece cada WILD_EVERY líneas y al aterrizar
+// borra su fila o su columna completa (↑/X alterna el modo).
+const WILD = 9;
+const WILD_EVERY = 5;
+const WILD_SCORE = 200;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -47,6 +54,7 @@ const THEME_KEY = 'tetris-theme';
 let gridColor, highlightColor;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let wildCharge, wildPending;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -56,6 +64,10 @@ function randomPiece() {
   const type = Math.floor(Math.random() * (PIECES.length - 1)) + 1;
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+}
+
+function wildPiece() {
+  return { type: WILD, shape: [[WILD]], x: Math.floor(COLS / 2), y: 0, wild: true, mode: 'row' };
 }
 
 function collide(shape, ox, oy) {
@@ -81,6 +93,10 @@ function rotateCW(shape) {
 }
 
 function tryRotate() {
+  if (current.wild) {
+    current.mode = current.mode === 'row' ? 'col' : 'row';
+    return;
+  }
   const rotated = rotateCW(current.shape);
   const kicks = [0, -1, 1, -2, 2];
   for (const kick of kicks) {
@@ -111,6 +127,11 @@ function clearLines() {
   }
   if (cleared) {
     lines += cleared;
+    wildCharge += cleared;
+    if (wildCharge >= WILD_EVERY) {
+      wildCharge -= WILD_EVERY;
+      wildPending = true;
+    }
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
@@ -141,15 +162,31 @@ function softDrop() {
   }
 }
 
+function applyWild() {
+  if (current.mode === 'row') {
+    board.splice(current.y, 1);
+    board.unshift(new Array(COLS).fill(0));
+  } else {
+    for (let r = 0; r < ROWS; r++) board[r][current.x] = 0;
+  }
+  score += WILD_SCORE * level;
+  updateHUD();
+}
+
 function lockPiece() {
-  merge();
-  clearLines();
+  if (current.wild) {
+    applyWild();
+  } else {
+    merge();
+    clearLines();
+  }
   spawn();
 }
 
 function spawn() {
   current = next;
-  next = randomPiece();
+  next = wildPending ? wildPiece() : randomPiece();
+  wildPending = false;
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
@@ -164,7 +201,11 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  let color = COLORS[colorIndex];
+  if (colorIndex === WILD) {
+    color = context.createLinearGradient(x * size, y * size, (x + 1) * size, (y + 1) * size);
+    ['#e57373', '#ffd54f', '#81c784', '#4dd0e1', '#ba68c8'].forEach((c, i, a) => color.addColorStop(i / (a.length - 1), c));
+  }
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
@@ -207,10 +248,28 @@ function draw() {
       if (current.shape[r][c])
         drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
 
+  // comodín: resalta la fila o columna que borrará al aterrizar
+  if (current.wild) {
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = COLORS[3];
+    if (current.mode === 'row') ctx.fillRect(0, gy * BLOCK, COLS * BLOCK, BLOCK);
+    else ctx.fillRect(current.x * BLOCK, 0, BLOCK, ROWS * BLOCK);
+    ctx.globalAlpha = 1;
+  }
+
   // current piece
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+  if (current.wild) drawWildMark(ctx, current.x, current.y, BLOCK, current.mode);
+}
+
+function drawWildMark(context, x, y, size, mode) {
+  context.fillStyle = '#212121';
+  context.font = `bold ${Math.floor(size * 0.6)}px sans-serif`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(mode === 'row' ? '↔' : '↕', x * size + size / 2, y * size + size / 2 + 1);
 }
 
 function drawNext() {
@@ -222,6 +281,7 @@ function drawNext() {
   for (let r = 0; r < shape.length; r++)
     for (let c = 0; c < shape[r].length; c++)
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
+  if (next.wild) drawWildMark(nextCtx, offX, offY, NB, next.mode);
 }
 
 function endGame() {
@@ -282,6 +342,8 @@ function init() {
   score = 0;
   lines = 0;
   level = 1;
+  wildCharge = 0;
+  wildPending = false;
   paused = false;
   gameOver = false;
   dropInterval = 1000;

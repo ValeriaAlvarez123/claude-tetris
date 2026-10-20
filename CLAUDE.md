@@ -30,6 +30,7 @@ All game logic lives in `game.js` (single file, no modules). Key pieces:
 - **Line clearing** (`clearLines`): scans bottom-to-top, splices out full rows and unshifts empty ones at the top.
 - **Scoring**: `LINE_SCORES = [0, 100, 300, 500, 800]` multiplied by `level`; hard drop adds 2 pts/row, soft drop adds 1 pt/row.
 - **Leveling**: level = `floor(lines / 10) + 1`; `dropInterval = max(100, 1000 - (level - 1) * 90)` ms.
+- **Comodín** (`WILD = 9`): cada `WILD_EVERY` líneas, `clearLines` activa `wildPending` y `spawn` pone un `wildPiece()` (1×1, `wild: true`, `mode: 'row'|'col'`) como `next`. `tryRotate` alterna el modo; `lockPiece` llama a `applyWild()` (borra fila o columna, `WILD_SCORE × level`) en vez de `merge`, así que el valor 9 nunca queda en `board`.
 - **Ghost piece** (`ghostY`): projects the current piece straight down to its landing row and draws it at low alpha.
 
 **Temas**: los colores viven como variables CSS en `style.css` (`:root` = oscuro por defecto, `[data-theme="light"]` = claro). `setTheme()` en `game.js` aplica `data-theme`, persiste la elección en `localStorage` (`tetris-theme`), cachea `--grid` y `--block-highlight` para el canvas y redibuja. `init()` no toca el tema.
