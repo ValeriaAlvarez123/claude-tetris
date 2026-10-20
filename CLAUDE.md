@@ -22,7 +22,7 @@ There is no build, lint, or test command — none exist in this repo.
 
 All game logic lives in `game.js` (single file, no modules). Key pieces:
 
-- **Board model**: `board` is a `ROWS × COLS` matrix; each cell is `0` (empty) or a color index `1–7` identifying which piece locked there.
+- **Board model**: `board` is a `ROWS × COLS` matrix; each cell is `0` (empty) or a color index `1–8` identifying which piece locked there.
 - **Pieces**: `PIECES` defines each tetromino as a square matrix of color indices. Rotation is done via `rotateCW` (transpose + reverse), not by storing pre-rotated shapes.
 - **Collision** (`collide`): checks a shape against board bounds and existing locked cells.
 - **Wall kicks** (`tryRotate`): after rotating, tries offsets `[0, -1, 1, -2, 2]` and keeps the first that doesn't collide.
