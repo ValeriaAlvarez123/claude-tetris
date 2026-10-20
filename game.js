@@ -15,6 +15,7 @@ const COLORS = [
   '#ffb74d', // L - orange
   '#f06292', // R - pink (anillo)
   '#ffffff', // W - comodín (se dibuja con degradado arcoíris)
+  '#a1887f', // C - compactadora
 ];
 
 const PIECES = [
@@ -37,6 +38,12 @@ const WILD = 9;
 const WILD_EVERY = 5;
 const WILD_SCORE = 200;
 
+// Compactadora: bloque 1×1 que aparece cada COMPACT_EVERY ms de juego y al
+// aterrizar aplica gravedad por columna en el área 5×5 que la rodea.
+const COMPACT = 10;
+const COMPACT_EVERY = 45000;
+const COMPACT_RADIUS = 2;
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -54,7 +61,7 @@ const THEME_KEY = 'tetris-theme';
 let gridColor, highlightColor;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
-let wildCharge, wildPending;
+let wildCharge, wildPending, compactAccum, compactPending;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -68,6 +75,10 @@ function randomPiece() {
 
 function wildPiece() {
   return { type: WILD, shape: [[WILD]], x: Math.floor(COLS / 2), y: 0, wild: true, mode: 'row' };
+}
+
+function compactPiece() {
+  return { type: COMPACT, shape: [[COMPACT]], x: Math.floor(COLS / 2), y: 0, compact: true };
 }
 
 function collide(shape, ox, oy) {
@@ -173,9 +184,26 @@ function applyWild() {
   updateHUD();
 }
 
+function applyCompact() {
+  const top = Math.max(0, current.y - COMPACT_RADIUS);
+  const bottom = Math.min(ROWS - 1, current.y + COMPACT_RADIUS);
+  const left = Math.max(0, current.x - COMPACT_RADIUS);
+  const right = Math.min(COLS - 1, current.x + COMPACT_RADIUS);
+  for (let c = left; c <= right; c++) {
+    const blocks = [];
+    for (let r = top; r <= bottom; r++)
+      if (board[r][c]) blocks.push(board[r][c]);
+    for (let r = bottom; r >= top; r--)
+      board[r][c] = blocks.pop() || 0;
+  }
+}
+
 function lockPiece() {
   if (current.wild) {
     applyWild();
+  } else if (current.compact) {
+    applyCompact();
+    clearLines();
   } else {
     merge();
     clearLines();
@@ -185,8 +213,15 @@ function lockPiece() {
 
 function spawn() {
   current = next;
-  next = wildPending ? wildPiece() : randomPiece();
-  wildPending = false;
+  if (wildPending) {
+    next = wildPiece();
+    wildPending = false;
+  } else if (compactPending) {
+    next = compactPiece();
+    compactPending = false;
+  } else {
+    next = randomPiece();
+  }
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
@@ -257,19 +292,33 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
+  // compactadora: resalta el área 5×5 que compactará al aterrizar
+  if (current.compact) {
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = COLORS[COMPACT];
+    const size = (COMPACT_RADIUS * 2 + 1) * BLOCK;
+    ctx.fillRect((current.x - COMPACT_RADIUS) * BLOCK, (gy - COMPACT_RADIUS) * BLOCK, size, size);
+    ctx.globalAlpha = 1;
+  }
+
   // current piece
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
-  if (current.wild) drawWildMark(ctx, current.x, current.y, BLOCK, current.mode);
+  drawMark(ctx, current, current.x, current.y, BLOCK);
 }
 
-function drawWildMark(context, x, y, size, mode) {
+// Símbolo sobre las piezas especiales: ↔/↕ comodín, ⇊ compactadora
+function drawMark(context, piece, x, y, size) {
+  let symbol;
+  if (piece.wild) symbol = piece.mode === 'row' ? '↔' : '↕';
+  else if (piece.compact) symbol = '⇊';
+  else return;
   context.fillStyle = '#212121';
   context.font = `bold ${Math.floor(size * 0.6)}px sans-serif`;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(mode === 'row' ? '↔' : '↕', x * size + size / 2, y * size + size / 2 + 1);
+  context.fillText(symbol, x * size + size / 2, y * size + size / 2 + 1);
 }
 
 function drawNext() {
@@ -281,7 +330,7 @@ function drawNext() {
   for (let r = 0; r < shape.length; r++)
     for (let c = 0; c < shape[r].length; c++)
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
-  if (next.wild) drawWildMark(nextCtx, offX, offY, NB, next.mode);
+  drawMark(nextCtx, next, offX, offY, NB);
 }
 
 function endGame() {
@@ -310,6 +359,11 @@ function loop(ts) {
   const dt = ts - lastTime;
   lastTime = ts;
   dropAccum += dt;
+  compactAccum += dt;
+  if (compactAccum >= COMPACT_EVERY) {
+    compactAccum = 0;
+    compactPending = true;
+  }
   if (dropAccum >= dropInterval) {
     dropAccum = 0;
     if (!collide(current.shape, current.x, current.y + 1)) {
@@ -344,6 +398,8 @@ function init() {
   level = 1;
   wildCharge = 0;
   wildPending = false;
+  compactAccum = 0;
+  compactPending = false;
   paused = false;
   gameOver = false;
   dropInterval = 1000;

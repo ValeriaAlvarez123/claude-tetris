@@ -88,6 +88,8 @@ Después abre `http://localhost:8000` en el navegador.
 
 **Comodín:** cada 5 líneas completadas aparece en la vista previa un bloque 1×1 arcoíris. Al aterrizar borra por completo su fila (`↔`) o su columna (`↕`) y da 200 pts × nivel. Mientras cae, `↑` / `X` alterna entre fila y columna; la zona que se borrará se resalta en el tablero.
 
+**Compactadora:** cada 45 s de juego (la pausa no cuenta) aparece un bloque 1×1 marrón con `⇊`. Al aterrizar, en el área de 5×5 centrada donde cae, los bloques de cada columna bajan hasta tapar los huecos; si con eso se completan filas, se borran y puntúan normalmente. El área afectada se resalta mientras cae.
+
 ---
 
 ## Cómo funciona
