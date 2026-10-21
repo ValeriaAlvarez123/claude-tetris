@@ -42,6 +42,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
+- **Skins** visuales (Retro, Neon, Pastel y Pixel art) que se cambian al vuelo desde el panel.
 
 ---
 
@@ -92,6 +93,17 @@ Después abre `http://localhost:8000` en el navegador.
 **Compactadora:** cada 45 s de juego (la pausa no cuenta) aparece un bloque 1×1 marrón con `⇊`. Al aterrizar, en el área de 5×5 centrada donde cae, los bloques de cada columna bajan hasta tapar los huecos; si con eso se completan filas, se borran y puntúan normalmente. El área afectada se resalta mientras cae.
 
 **Bomba:** cada 10 líneas completadas aparece un bloque 1×1 naranja con `✸`. Al aterrizar destruye todos los bloques del área 3×3 centrada donde cae y da 200 pts × nivel. Tiene prioridad sobre el comodín y la compactadora. El área afectada se resalta mientras cae.
+
+**Skins:** el selector `SKIN` del panel cambia la apariencia completa sin recargar la página:
+
+| Skin      | Aspecto                                                        |
+| --------- | -------------------------------------------------------------- |
+| Retro     | Bloques cuadrados y colores planos (estilo original)           |
+| Neon      | Fondo negro y bloques con efecto _glow_ (`shadowBlur`)         |
+| Pastel    | Colores suaves y bordes redondeados                            |
+| Pixel art | Textura de píxeles (brillos y sombras) dibujada en cada bloque |
+
+La elección se guarda en `localStorage` (`tetris-skin`) y es independiente del modo claro/oscuro.
 
 ---
 
@@ -181,6 +193,7 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `ROWS`         | Filas del tablero                        | `20`                  |
 | `BLOCK`        | Tamaño en píxeles de cada celda          | `30`                  |
 | `COLORS`       | Paleta de colores por tipo de pieza      | 8 colores             |
+| `SKINS`        | Paleta y función de dibujo de cada skin  | 4 skins               |
 | `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
 | `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
 
