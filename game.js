@@ -68,6 +68,95 @@ const CHALLENGES = {
   },
 };
 
+// Skins: cada una define su paleta (mismos índices que COLORS) y cómo se
+// dibuja una celda. `drawCell(context, px, py, size, color)` recibe la esquina
+// en píxeles; `color` puede ser un degradado (comodín).
+function roundRectPath(context, x, y, w, h, r) {
+  context.beginPath();
+  if (context.roundRect) {
+    context.roundRect(x, y, w, h, r);
+  } else {
+    context.moveTo(x + r, y);
+    context.arcTo(x + w, y, x + w, y + h, r);
+    context.arcTo(x + w, y + h, x, y + h, r);
+    context.arcTo(x, y + h, x, y, r);
+    context.arcTo(x, y, x + w, y, r);
+    context.closePath();
+  }
+}
+
+const SKINS = {
+  retro: {
+    colors: COLORS,
+    drawCell(context, px, py, size, color) {
+      context.fillStyle = color;
+      context.fillRect(px + 1, py + 1, size - 2, size - 2);
+      // highlight
+      context.fillStyle = highlightColor;
+      context.fillRect(px + 1, py + 1, size - 2, 4);
+    },
+  },
+  neon: {
+    colors: [
+      null,
+      '#00f0ff', '#fff200', '#d500f9', '#39ff14', '#ff1744', '#2979ff',
+      '#ff9100', '#ff4081', '#ffffff', '#d7a86e', '#9e9e9e', '#ff3d00',
+    ],
+    drawCell(context, px, py, size, color) {
+      context.save();
+      context.shadowColor = typeof color === 'string' ? color : '#ffffff';
+      context.shadowBlur = size * 0.6;
+      context.strokeStyle = color;
+      context.lineWidth = 2;
+      context.strokeRect(px + 3, py + 3, size - 6, size - 6);
+      context.globalAlpha *= 0.3;
+      context.fillStyle = color;
+      context.fillRect(px + 3, py + 3, size - 6, size - 6);
+      context.restore();
+      context.shadowBlur = 0; // no contaminar rejilla ni texto
+    },
+  },
+  pastel: {
+    colors: [
+      null,
+      '#a8e6ef', '#fff1a8', '#d7b8e8', '#b9e4c0', '#f5b5b5', '#c3dcf7',
+      '#ffd6a5', '#f8bbd9', '#ffffff', '#d7ccc8', '#b8b8c0', '#ffab91',
+    ],
+    drawCell(context, px, py, size, color) {
+      const r = size * 0.25;
+      context.fillStyle = color;
+      roundRectPath(context, px + 2, py + 2, size - 4, size - 4, r);
+      context.fill();
+      context.fillStyle = highlightColor;
+      roundRectPath(context, px + 5, py + 4, size - 10, size * 0.2, size * 0.1);
+      context.fill();
+    },
+  },
+  pixel: {
+    colors: COLORS,
+    drawCell(context, px, py, size, color) {
+      const n = 5, p = size / n;
+      context.fillStyle = color;
+      context.fillRect(px, py, size, size);
+      for (let i = 0; i < n; i++) {
+        // borde superior/izquierdo claro, inferior/derecho oscuro
+        context.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        context.fillRect(px + i * p, py, p, p);
+        context.fillRect(px, py + i * p, p, p);
+        context.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        context.fillRect(px + i * p, py + size - p, p, p);
+        context.fillRect(px + size - p, py + i * p, p, p);
+      }
+      // textura interior: un brillo y dos píxeles de sombra
+      context.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      context.fillRect(px + p, py + p, p, p);
+      context.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      context.fillRect(px + 3 * p, py + 2 * p, p, p);
+      context.fillRect(px + 2 * p, py + 3 * p, p, p);
+    },
+  },
+};
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -87,8 +176,12 @@ const challengesMenu = challengesEl.querySelector('.multiselect-menu');
 const challengeOptions = challengesMenu.querySelectorAll('[role="option"]');
 const challengeInfo = document.getElementById('challenge-info');
 
+const skinSelect = document.getElementById('skin-select');
+
 const THEME_KEY = 'tetris-theme';
+const SKIN_KEY = 'tetris-skin';
 let gridColor, highlightColor;
+let skin = SKINS.retro;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let wildCharge, wildPending, compactAccum, compactPending, bombCharge, bombPending;
@@ -324,17 +417,14 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  let color = COLORS[colorIndex];
+  const colors = skin.colors;
+  let color = colors[colorIndex];
   if (colorIndex === WILD) {
     color = context.createLinearGradient(x * size, y * size, (x + 1) * size, (y + 1) * size);
-    ['#e57373', '#ffd54f', '#81c784', '#4dd0e1', '#ba68c8'].forEach((c, i, a) => color.addColorStop(i / (a.length - 1), c));
+    [5, 2, 4, 1, 3].forEach((ci, i, a) => color.addColorStop(i / (a.length - 1), colors[ci]));
   }
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = highlightColor;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  skin.drawCell(context, x * size, y * size, size, color);
   context.globalAlpha = 1;
 }
 
@@ -374,7 +464,7 @@ function draw() {
   // comodín: resalta la fila o columna que borrará al aterrizar
   if (current.wild) {
     ctx.globalAlpha = 0.25;
-    ctx.fillStyle = COLORS[3];
+    ctx.fillStyle = skin.colors[3];
     if (current.mode === 'row') ctx.fillRect(0, gy * BLOCK, COLS * BLOCK, BLOCK);
     else ctx.fillRect(current.x * BLOCK, 0, BLOCK, ROWS * BLOCK);
     ctx.globalAlpha = 1;
@@ -383,7 +473,7 @@ function draw() {
   // compactadora: resalta el área 5×5 que compactará al aterrizar
   if (current.compact) {
     ctx.globalAlpha = 0.25;
-    ctx.fillStyle = COLORS[COMPACT];
+    ctx.fillStyle = skin.colors[COMPACT];
     const size = (COMPACT_RADIUS * 2 + 1) * BLOCK;
     ctx.fillRect((current.x - COMPACT_RADIUS) * BLOCK, (gy - COMPACT_RADIUS) * BLOCK, size, size);
     ctx.globalAlpha = 1;
@@ -392,7 +482,7 @@ function draw() {
   // bomba: resalta el área 3×3 que destruirá al aterrizar
   if (current.bomb) {
     ctx.globalAlpha = 0.25;
-    ctx.fillStyle = COLORS[BOMB];
+    ctx.fillStyle = skin.colors[BOMB];
     const size = (BOMB_RADIUS * 2 + 1) * BLOCK;
     ctx.fillRect((current.x - BOMB_RADIUS) * BLOCK, (gy - BOMB_RADIUS) * BLOCK, size, size);
     ctx.globalAlpha = 1;
@@ -498,10 +588,26 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   themeToggle.checked = theme === 'light';
   try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* almacenamiento no disponible */ }
+  refreshCanvas();
+}
+
+// La skin es independiente del tema: Neon fuerza el fondo negro del canvas
+// vía `data-skin` en <html> (ver style.css).
+function setSkin(id) {
+  if (!Object.prototype.hasOwnProperty.call(SKINS, id)) id = 'retro';
+  skin = SKINS[id];
+  document.documentElement.dataset.skin = id;
+  skinSelect.value = id;
+  try { localStorage.setItem(SKIN_KEY, id); } catch (e) { /* almacenamiento no disponible */ }
+  refreshCanvas();
+}
+
+// Cachea los colores del canvas desde las variables CSS y redibuja para que
+// el cambio de tema o skin se vea también en pausa o game over.
+function refreshCanvas() {
   const styles = getComputedStyle(document.documentElement);
   gridColor = styles.getPropertyValue('--grid').trim();
   highlightColor = styles.getPropertyValue('--block-highlight').trim();
-  // Redibujar para que el cambio se vea también en pausa o game over
   if (current) {
     draw();
     drawNext();
@@ -575,6 +681,11 @@ themeToggle.addEventListener('change', () => {
   themeToggle.blur(); // evita que Space active el switch en vez de la caída
 });
 
+skinSelect.addEventListener('change', () => {
+  setSkin(skinSelect.value);
+  skinSelect.blur(); // devuelve las flechas y Space al juego
+});
+
 function setChallengesOpen(open) {
   challengesMenu.hidden = !open;
   challengesToggle.setAttribute('aria-expanded', open);
@@ -601,5 +712,9 @@ document.addEventListener('click', e => {
 let savedTheme = null;
 try { savedTheme = localStorage.getItem(THEME_KEY); } catch (e) { /* ignorar */ }
 setTheme(savedTheme === 'light' ? 'light' : 'dark');
+
+let savedSkin = null;
+try { savedSkin = localStorage.getItem(SKIN_KEY); } catch (e) { /* ignorar */ }
+setSkin(savedSkin);
 
 init();

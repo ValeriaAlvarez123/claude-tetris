@@ -40,6 +40,12 @@
   --block-highlight: rgba(255, 255, 255, 0.35);
 }
 
+/* Skin Neon: fondo negro en los canvas con cualquier tema */
+:root[data-skin="neon"] {
+  --canvas-bg: #000000;
+  --grid: #12121c;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -287,6 +293,26 @@ body {
 .theme-toggle input:focus-visible + .slider {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ---- Selector de skin ---- */
+.skin-select {
+  width: 100%;
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.skin-select:hover,
+.skin-select:focus-visible {
+  border-color: var(--accent);
+  outline: none;
 }
 
 /* ---- Controles ---- */
