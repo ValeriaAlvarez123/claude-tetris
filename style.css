@@ -242,6 +242,134 @@ body {
   white-space: pre-line;
 }
 
+/* ---- Récords ---- */
+.records table {
+  width: 100%;
+  table-layout: fixed; /* hace efectiva la elipsis del nombre */
+  border-collapse: collapse;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.records th {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--label);
+  text-align: left;
+  padding: 2px 4px;
+}
+
+.records td {
+  padding: 2px 4px;
+  border-top: 1px solid var(--border);
+}
+
+.records th:nth-child(1) { width: 20px; }
+.records th:nth-child(3) { width: 62px; }
+.records th:nth-child(n+4) { width: 46px; }
+
+.records td:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records th:nth-child(n+3),
+.records td:nth-child(n+3) {
+  text-align: right;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.records tr.highlight td {
+  background: var(--kbd-bg);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.records-empty,
+.records-stats {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.records-stats {
+  margin-top: 6px;
+  white-space: pre-line;
+}
+
+.records-reset {
+  align-self: flex-start;
+  background: none;
+  color: var(--danger);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.records-reset:hover {
+  border-color: var(--danger);
+}
+
+.overlay-records {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overlay-records[hidden],
+.overlay-records [hidden] {
+  display: none;
+}
+
+.new-record {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.name-form {
+  display: flex;
+  gap: 6px;
+}
+
+.name-form input {
+  flex: 1;
+  min-width: 0;
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  user-select: text;
+}
+
+.name-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.name-form button {
+  background: var(--accent);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.name-form button:hover {
+  background: var(--accent-hover);
+}
+
 /* ---- Toggle de tema ---- */
 .theme-toggle {
   display: flex;
