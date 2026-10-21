@@ -17,6 +17,7 @@ const COLORS = [
   '#ffffff', // W - comodín (se dibuja con degradado arcoíris)
   '#a1887f', // C - compactadora
   '#616161', // G - basura (desafío)
+  '#ff7043', // B - bomba
 ];
 
 const PIECES = [
@@ -45,14 +46,26 @@ const COMPACT = 10;
 const COMPACT_EVERY = 45000;
 const COMPACT_RADIUS = 2;
 
+// Bomba: bloque 1×1 que aparece cada BOMB_EVERY líneas y al aterrizar
+// destruye el área 3×3 que la rodea.
+const BOMB = 12;
+const BOMB_EVERY = 10;
+const BOMB_RADIUS = 1;
+const BOMB_SCORE = 200;
+
 // Desafíos: reglas opcionales y combinables que suben la dificultad.
-// `start` se ejecuta al iniciar la partida; `apply` cada `every` ms de juego.
+// `start` se ejecuta al iniciar la partida; `apply` cada `every` ms de juego;
+// `levelUp` cada vez que sube el nivel.
 const GARBAGE = 11;
-const SCATTER_COUNT = 15;
+const SCATTER_COUNT = 8;
+const SCATTER_PER_LEVEL = 3;
 const SCATTER_ROWS = 8;
 const CHALLENGES = {
-  garbage: { every: 20000, apply: () => addGarbage(2), info: 'Basura en' },
-  scattered: { start: () => scatterGarbage(SCATTER_COUNT, SCATTER_ROWS) },
+  garbage: { every: 30000, apply: () => addGarbage(1), info: 'Basura en' },
+  scattered: {
+    start: () => scatterGarbage(SCATTER_COUNT, SCATTER_ROWS),
+    levelUp: () => scatterGarbage(SCATTER_PER_LEVEL, SCATTER_ROWS),
+  },
 };
 
 const canvas = document.getElementById('board');
@@ -78,7 +91,7 @@ const THEME_KEY = 'tetris-theme';
 let gridColor, highlightColor;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
-let wildCharge, wildPending, compactAccum, compactPending;
+let wildCharge, wildPending, compactAccum, compactPending, bombCharge, bombPending;
 let activeChallenges = new Set(), challengeAccum;
 
 function createBoard() {
@@ -97,6 +110,10 @@ function wildPiece() {
 
 function compactPiece() {
   return { type: COMPACT, shape: [[COMPACT]], x: Math.floor(COLS / 2), y: 0, compact: true };
+}
+
+function bombPiece() {
+  return { type: BOMB, shape: [[BOMB]], x: Math.floor(COLS / 2), y: 0, bomb: true };
 }
 
 function collide(shape, ox, oy) {
@@ -161,8 +178,16 @@ function clearLines() {
       wildCharge -= WILD_EVERY;
       wildPending = true;
     }
+    bombCharge += cleared;
+    if (bombCharge >= BOMB_EVERY) {
+      bombCharge -= BOMB_EVERY;
+      bombPending = true;
+    }
     score += (LINE_SCORES[cleared] || 0) * level;
+    const prevLevel = level;
     level = Math.floor(lines / 10) + 1;
+    for (let l = prevLevel; l < level; l++)
+      for (const id of activeChallenges) CHALLENGES[id].levelUp?.();
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     updateHUD();
   }
@@ -216,6 +241,14 @@ function applyCompact() {
   }
 }
 
+function applyBomb() {
+  for (let r = current.y - BOMB_RADIUS; r <= current.y + BOMB_RADIUS; r++)
+    for (let c = current.x - BOMB_RADIUS; c <= current.x + BOMB_RADIUS; c++)
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) board[r][c] = 0;
+  score += BOMB_SCORE * level;
+  updateHUD();
+}
+
 // Sube `count` filas de basura (cada una con un hueco al azar) desde abajo.
 function addGarbage(count) {
   for (let i = 0; i < count; i++) {
@@ -251,6 +284,8 @@ function lockPiece() {
   }
   if (current.wild) {
     applyWild();
+  } else if (current.bomb) {
+    applyBomb();
   } else if (current.compact) {
     applyCompact();
     clearLines();
@@ -263,7 +298,10 @@ function lockPiece() {
 
 function spawn() {
   current = next;
-  if (wildPending) {
+  if (bombPending) {
+    next = bombPiece();
+    bombPending = false;
+  } else if (wildPending) {
     next = wildPiece();
     wildPending = false;
   } else if (compactPending) {
@@ -351,6 +389,15 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
+  // bomba: resalta el área 3×3 que destruirá al aterrizar
+  if (current.bomb) {
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = COLORS[BOMB];
+    const size = (BOMB_RADIUS * 2 + 1) * BLOCK;
+    ctx.fillRect((current.x - BOMB_RADIUS) * BLOCK, (gy - BOMB_RADIUS) * BLOCK, size, size);
+    ctx.globalAlpha = 1;
+  }
+
   // current piece
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
@@ -358,11 +405,12 @@ function draw() {
   drawMark(ctx, current, current.x, current.y, BLOCK);
 }
 
-// Símbolo sobre las piezas especiales: ↔/↕ comodín, ⇊ compactadora
+// Símbolo sobre las piezas especiales: ↔/↕ comodín, ⇊ compactadora, ✸ bomba
 function drawMark(context, piece, x, y, size) {
   let symbol;
   if (piece.wild) symbol = piece.mode === 'row' ? '↔' : '↕';
   else if (piece.compact) symbol = '⇊';
+  else if (piece.bomb) symbol = '✸';
   else return;
   context.fillStyle = '#212121';
   context.font = `bold ${Math.floor(size * 0.6)}px sans-serif`;
@@ -469,6 +517,8 @@ function init() {
   wildPending = false;
   compactAccum = 0;
   compactPending = false;
+  bombCharge = 0;
+  bombPending = false;
   challengeAccum = {};
   for (const id of activeChallenges) {
     challengeAccum[id] = 0;
@@ -490,6 +540,11 @@ function init() {
 
 document.addEventListener('keydown', e => {
   if (e.code === 'KeyP') { togglePause(); return; }
+  if (gameOver && (e.code === 'Enter' || e.code === 'NumpadEnter')) {
+    e.preventDefault();
+    init();
+    return;
+  }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':

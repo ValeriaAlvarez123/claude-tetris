@@ -85,10 +85,13 @@ Después abre `http://localhost:8000` en el navegador.
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
 | `P`       | Pausar / reanudar                 |
+| `Enter`   | Reiniciar (tras Game Over)        |
 
 **Comodín:** cada 5 líneas completadas aparece en la vista previa un bloque 1×1 arcoíris. Al aterrizar borra por completo su fila (`↔`) o su columna (`↕`) y da 200 pts × nivel. Mientras cae, `↑` / `X` alterna entre fila y columna; la zona que se borrará se resalta en el tablero.
 
 **Compactadora:** cada 45 s de juego (la pausa no cuenta) aparece un bloque 1×1 marrón con `⇊`. Al aterrizar, en el área de 5×5 centrada donde cae, los bloques de cada columna bajan hasta tapar los huecos; si con eso se completan filas, se borran y puntúan normalmente. El área afectada se resalta mientras cae.
+
+**Bomba:** cada 10 líneas completadas aparece un bloque 1×1 naranja con `✸`. Al aterrizar destruye todos los bloques del área 3×3 centrada donde cae y da 200 pts × nivel. Tiene prioridad sobre el comodín y la compactadora. El área afectada se resalta mientras cae.
 
 ---
 
