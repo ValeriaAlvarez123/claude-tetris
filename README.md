@@ -41,7 +41,8 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Vista previa** de la siguiente pieza.
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
-- **Pausa** y **Game Over** con opción de reinicio.
+- **Menú de pausa** (`P` o `Esc`) con Reanudar, Reiniciar, Ver controles y selector de **nivel inicial** (1–10, se recuerda entre sesiones).
+- **Game Over** con opción de reinicio.
 
 ---
 
@@ -78,14 +79,23 @@ Después abre `http://localhost:8000` en el navegador.
 
 ## Controles
 
-| Tecla     | Acción                            |
-| --------- | --------------------------------- |
-| `←` / `→` | Mover la pieza horizontalmente    |
-| `↑` o `X` | Rotar la pieza en sentido horario |
-| `↓`       | Soft drop (bajar más rápido)      |
-| `Espacio` | Hard drop (caída instantánea)     |
-| `P`       | Pausar / reanudar                 |
-| `Enter`   | Reiniciar (tras Game Over)        |
+| Tecla       | Acción                            |
+| ----------- | --------------------------------- |
+| `←` / `→`   | Mover la pieza horizontalmente    |
+| `↑` o `X`   | Rotar la pieza en sentido horario |
+| `↓`         | Soft drop (bajar más rápido)      |
+| `Espacio`   | Hard drop (caída instantánea)     |
+| `P` / `Esc` | Abrir / cerrar el menú de pausa   |
+| `Enter`     | Reiniciar (tras Game Over)        |
+
+**Menú de pausa:** `P` o `Esc` detienen el juego y abren un menú con:
+
+- **Reanudar** — vuelve a la partida.
+- **Reiniciar** — empieza una partida nueva sin recargar la página.
+- **Ver controles** — despliega la lista de teclas dentro del propio menú.
+- **Nivel inicial** — elige con qué nivel (1–10) empieza la próxima partida; se guarda en `localStorage` y se aplica al reiniciar. Con nivel inicial _N_ la caída arranca a la velocidad de ese nivel y no sube hasta alcanzar las líneas del nivel _N + 1_.
+
+Mientras el menú está abierto el juego no recibe input: las flechas y `Tab` mueven el foco entre las opciones, y `Espacio` / `Enter` activan la opción enfocada. Al reanudar, las teclas que sigan pulsadas se ignoran hasta soltarlas y el temporizador de caída se reinicia, para evitar movimientos accidentales.
 
 **Comodín:** cada 5 líneas completadas aparece en la vista previa un bloque 1×1 arcoíris. Al aterrizar borra por completo su fila (`↔`) o su columna (`↕`) y da 200 pts × nivel. Mientras cae, `↑` / `X` alterna entre fila y columna; la zona que se borrará se resalta en el tablero.
 
@@ -105,7 +115,7 @@ Define la estructura visual:
 
 - Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
 - Un panel lateral con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
-- Un overlay para los estados **PAUSA** y **GAME OVER**.
+- Un menú de pausa (`#pause-menu`) y un overlay para **GAME OVER** (`#overlay`).
 
 ### 2. `style.css`
 
@@ -140,7 +150,7 @@ init()
      ├─ draw()  (grid + tablero + ghost + pieza actual)
      └─ requestAnimationFrame(loop)
 
-   keydown → mover / rotar / soft-drop / hard-drop / pausa
+   keydown → mover / rotar / soft-drop / hard-drop / menú de pausa
 ```
 
 Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.

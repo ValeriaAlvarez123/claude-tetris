@@ -66,7 +66,7 @@
             <li><kbd>↑</kbd> rotar</li>
             <li><kbd>↓</kbd> bajar</li>
             <li><kbd>Space</kbd> caída</li>
-            <li><kbd>P</kbd> pausa</li>
+            <li><kbd>P</kbd><kbd>Esc</kbd> menú de pausa</li>
             <li><kbd>↑</kbd> comodín: fila/columna</li>
             <li><kbd>⇊</kbd> compacta 5×5 (cada 45 s)</li>
             <li><kbd>✸</kbd> bomba 3×3 (cada 10 líneas)</li>
@@ -80,6 +80,29 @@
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
         <button id="restart-btn">Reiniciar</button>
+      </div>
+    </div>
+
+    <div id="pause-menu" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="overlay-box pause-box">
+        <p id="pause-title" class="pause-title">PAUSA</p>
+        <button type="button" class="menu-btn primary" id="resume-btn">Reanudar</button>
+        <button type="button" class="menu-btn" id="pause-restart-btn">Reiniciar</button>
+        <button type="button" class="menu-btn" id="pause-controls-btn" aria-expanded="false" aria-controls="pause-controls">Ver controles</button>
+        <ul class="pause-controls" id="pause-controls" hidden>
+          <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+          <li><kbd>↑</kbd> / <kbd>X</kbd> rotar (comodín: fila/columna)</li>
+          <li><kbd>↓</kbd> bajar</li>
+          <li><kbd>Space</kbd> caída instantánea</li>
+          <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa / reanudar</li>
+          <li><kbd>Enter</kbd> reiniciar tras game over</li>
+        </ul>
+        <label class="start-level">
+          <span class="label">NIVEL INICIAL</span>
+          <!-- Las opciones (1–MAX_START_LEVEL) las genera game.js -->
+          <select id="start-level" aria-label="Nivel inicial de la próxima partida"></select>
+        </label>
+        <small class="start-level-hint">Se aplica al reiniciar</small>
       </div>
     </div>
   </div>
