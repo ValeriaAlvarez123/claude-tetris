@@ -86,11 +86,27 @@ const challengesLabel = challengesEl.querySelector('.multiselect-label');
 const challengesMenu = challengesEl.querySelector('.multiselect-menu');
 const challengeOptions = challengesMenu.querySelectorAll('[role="option"]');
 const challengeInfo = document.getElementById('challenge-info');
+const pauseMenu = document.getElementById('pause-menu');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseControlsBtn = document.getElementById('pause-controls-btn');
+const pauseControls = document.getElementById('pause-controls');
+const startLevelEl = document.getElementById('start-level');
 
 const THEME_KEY = 'tetris-theme';
 let gridColor, highlightColor;
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+// Nivel inicial elegido en el menú de pausa (se aplica en la próxima partida)
+const START_LEVEL_KEY = 'tetris-start-level';
+const MAX_START_LEVEL = 10;
+let startLevel = 1;
+
+// Teclas físicamente pulsadas y teclas que el juego ignora hasta su `keyup`
+// (las que seguían pulsadas al reanudar o reiniciar).
+const pressedKeys = new Set();
+let ignoredKeys = new Set();
+
+let board, current, next, score, lines, level, baseLevel, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let wildCharge, wildPending, compactAccum, compactPending, bombCharge, bombPending;
 let activeChallenges = new Set(), challengeAccum;
 
@@ -185,12 +201,18 @@ function clearLines() {
     }
     score += (LINE_SCORES[cleared] || 0) * level;
     const prevLevel = level;
-    level = Math.floor(lines / 10) + 1;
+    // Con nivel inicial > 1 no se sube hasta que las líneas superen ese nivel
+    level = Math.max(baseLevel, Math.floor(lines / 10) + 1);
+    // Los `levelUp` solo se disparan por cada nivel realmente subido
     for (let l = prevLevel; l < level; l++)
       for (const id of activeChallenges) CHALLENGES[id].levelUp?.();
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    dropInterval = intervalFor(level);
     updateHUD();
   }
+}
+
+function intervalFor(lvl) {
+  return Math.max(100, 1000 - (lvl - 1) * 90);
 }
 
 function ghostY() {
@@ -441,17 +463,69 @@ function endGame() {
 
 function togglePause() {
   if (gameOver) return;
-  paused = !paused;
-  if (!paused) {
-    overlay.classList.add('hidden');
-    lastTime = performance.now();
-    loop(lastTime);
-  } else {
-    cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
+  if (paused) resumeGame();
+  else pauseGame();
+}
+
+function pauseGame() {
+  paused = true;
+  cancelAnimationFrame(animId);
+  setChallengesOpen(false);
+  setPauseControlsOpen(false);
+  pauseMenu.classList.remove('hidden');
+  resumeBtn.focus();
+}
+
+function resumeGame() {
+  if (!paused || gameOver) return;
+  paused = false;
+  closePauseMenu();
+  // Evitar movimientos accidentales: lo que siga pulsado se ignora hasta soltarlo
+  ignoredKeys = new Set(pressedKeys);
+  dropAccum = 0;
+  lastTime = performance.now();
+  animId = requestAnimationFrame(loop);
+}
+
+function closePauseMenu() {
+  pauseMenu.classList.add('hidden');
+  // Quitar el foco del menú para que Space/Enter no vuelvan a activar sus botones
+  if (pauseMenu.contains(document.activeElement)) document.activeElement.blur();
+}
+
+function setPauseControlsOpen(open) {
+  pauseControls.hidden = !open;
+  pauseControlsBtn.setAttribute('aria-expanded', open);
+  pauseControlsBtn.textContent = open ? 'Ocultar controles' : 'Ver controles';
+}
+
+// Navegación del menú de pausa con teclado: el juego no recibe nada.
+function handlePauseMenuKey(e) {
+  const items = [...pauseMenu.querySelectorAll('button, select')];
+  const active = document.activeElement;
+  const i = items.indexOf(active);
+  const onSelect = active === startLevelEl;
+  let step = 0;
+  if (e.code === 'Tab') step = e.shiftKey ? -1 : 1;
+  else if (e.code === 'ArrowDown' || e.code === 'ArrowRight') step = onSelect && e.code === 'ArrowDown' ? 0 : 1;
+  else if (e.code === 'ArrowUp' || e.code === 'ArrowLeft') step = onSelect && e.code === 'ArrowUp' ? 0 : -1;
+  if (!step) {
+    // Space/Enter activan el control enfocado; si no hay ninguno, no hacen nada
+    if (i < 0 && (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter')) e.preventDefault();
+    return;
   }
+  e.preventDefault();
+  const target = i < 0 ? (step > 0 ? 0 : items.length - 1) : (i + step + items.length) % items.length;
+  items[target].focus();
+}
+
+// Aplica el nivel inicial (acotado a 1–MAX_START_LEVEL); con `save` lo persiste
+function setStartLevel(value, save) {
+  const n = parseInt(value, 10);
+  startLevel = Number.isInteger(n) ? Math.min(MAX_START_LEVEL, Math.max(1, n)) : 1;
+  startLevelEl.value = String(startLevel);
+  if (!save) return;
+  try { localStorage.setItem(START_LEVEL_KEY, String(startLevel)); } catch (e) { /* almacenamiento no disponible */ }
 }
 
 function loop(ts) {
@@ -512,7 +586,8 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  baseLevel = startLevel;
+  level = baseLevel;
   wildCharge = 0;
   wildPending = false;
   compactAccum = 0;
@@ -523,29 +598,49 @@ function init() {
   for (const id of activeChallenges) {
     challengeAccum[id] = 0;
     CHALLENGES[id].start?.();
+    // Empezar en nivel N equivale a haber subido N-1 niveles
+    for (let l = 1; l < baseLevel; l++) CHALLENGES[id].levelUp?.();
   }
   updateChallengeInfo();
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = intervalFor(level);
   dropAccum = 0;
   lastTime = performance.now();
+  ignoredKeys = new Set(pressedKeys);
   next = randomPiece();
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  closePauseMenu();
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  pressedKeys.add(e.code);
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    e.preventDefault();
+    // Ignorar la repetición automática para que mantener P no abra y cierre el menú
+    if (!e.repeat) togglePause();
+    return;
+  }
   if (gameOver && (e.code === 'Enter' || e.code === 'NumpadEnter')) {
     e.preventDefault();
     init();
     return;
   }
-  if (paused || gameOver) return;
+  if (paused) { handlePauseMenuKey(e); return; }
+  if (gameOver) return;
+  if (ignoredKeys.has(e.code)) {
+    // Solo se ignora la repetición de una tecla que seguía pulsada; una pulsación
+    // nueva cuenta (por si su `keyup` nunca llegó, p. ej. lo consumió el <select>)
+    if (e.repeat) {
+      if (e.code === 'Space') e.preventDefault();
+      return;
+    }
+    ignoredKeys.delete(e.code);
+  }
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -568,7 +663,23 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
+document.addEventListener('keyup', e => {
+  pressedKeys.delete(e.code);
+  ignoredKeys.delete(e.code);
+});
+
+// Si la ventana pierde el foco no llegan los `keyup`: olvidar las teclas pulsadas
+window.addEventListener('blur', () => {
+  pressedKeys.clear();
+  ignoredKeys.clear();
+});
+
 restartBtn.addEventListener('click', init);
+
+resumeBtn.addEventListener('click', resumeGame);
+pauseRestartBtn.addEventListener('click', init);
+pauseControlsBtn.addEventListener('click', () => setPauseControlsOpen(pauseControls.hidden));
+startLevelEl.addEventListener('change', () => setStartLevel(startLevelEl.value, true));
 
 themeToggle.addEventListener('change', () => {
   setTheme(themeToggle.checked ? 'light' : 'dark');
@@ -601,5 +712,10 @@ document.addEventListener('click', e => {
 let savedTheme = null;
 try { savedTheme = localStorage.getItem(THEME_KEY); } catch (e) { /* ignorar */ }
 setTheme(savedTheme === 'light' ? 'light' : 'dark');
+
+for (let l = 1; l <= MAX_START_LEVEL; l++) startLevelEl.add(new Option(String(l), String(l)));
+let savedStartLevel = null;
+try { savedStartLevel = localStorage.getItem(START_LEVEL_KEY); } catch (e) { /* ignorar */ }
+setStartLevel(savedStartLevel);
 
 init();
